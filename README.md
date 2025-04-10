@@ -18,9 +18,13 @@
 ## 📊 數據集
 本專案使用來自 Kaggle 的「Best Artworks of All Time」數據集。數據集包含了來自多位世界著名畫家的數千幅畫作。每幅畫作的標籤對應畫家的名稱，目的是根據這些畫作來訓練模型，讓模型學會辨識不同畫家的風格。
 
+- **圖片大小處理**：由於資料集中的原始圖片大小不統一，我將所有圖片統一讀取為 **1024x1024** 的大小。這樣的尺寸有助於保留圖片的細節與特徵，但過大的圖片會導致記憶體負擔過重，因此我將每幅圖片進一步調整為 **256x256** 的大小，這是較適合用於 CNN 模型訓練的尺寸，同時避免了超出 GPU 記憶體限制。
+- **標註**：每幅畫作都標註了對應的畫家，這是我的目標變數（target variable）。
+- **類別**：資料集包含了數十位著名畫家的作品，每位畫家的畫作數量不同，這使得類別不平衡成為一個挑戰。
+
 你可以下載數據集並將其解壓到專案的 data/ 目錄中。數據集鏈接如下：
 
-Kaggle: Best Artworks of All Time
+[Best Artworks of All Time - Kaggle Dataset](https://www.kaggle.com/datasets/ikarus777/best-artworks-of-all-time/data)
 
 ## 類別不平衡處理方法
 
@@ -133,7 +137,7 @@ ReduceLROnPlateau 回調函數根據驗證損失 (val_loss) 的改善情況動�
 - min_lr: 學習率的最小值，防止學習率衰減過低。
 - verbose: 訓練過程中的輸出級別，設為 1 會顯示學習率調整的相關訊息。
 
-```
+```python
 reduce_lr = ReduceLROnPlateau(
     monitor='val_loss',
     factor=0.5,
@@ -163,7 +167,7 @@ reduce_lr = ReduceLROnPlateau(
 - **充分利用數據**：在每一輪交叉驗證中，都會有不同的子集作為訓練和驗證數據，使得所有的數據都有機會被用來訓練和測試模型，從而更充分地利用了數據。
 - **減少過擬合風險**：由於訓練和測試的數據集不同，交叉驗證有助於檢測模型是否存在過擬合現象。
 
-#### 4. **實現**
+### 4. **實現**
 
 以下是實現10折交叉驗證的核心邏輯：
 
@@ -239,7 +243,7 @@ model_weights = {
 
 在進行模型預測時，使用加權投票方法來計算每個類別的最終預測結果。具體來說，對於每一個測試樣本，將所有模型的預測結果加權平均，權重由每個模型的表現決定。最終選擇預測概率最高的類別作為該樣本的預測結果。
 
-```
+```python
 # 進行加權投票
 def weighted_vote(preds_list, model_weights):
     # preds_list 是所有模型對每個樣本的預測結果，每個預測結果是類別的機率分布
@@ -292,12 +296,28 @@ final_preds = np.argmax(weighted_preds, axis=1)
 最終，我選擇了基於 F1-score 來進行權重投票的方法，這能夠有效提高模型在測試集上的準確率。這種集成方法成功地將多個模型的優勢結合，並顯示出相較於單一模型更為穩定和可靠的表現。
 
 
-## 🧑‍🔬 作者
-許庭維 (Yves Hsu)
+## 技術難題與最終成果
 
-GitHub: hsutingwei
+在進行本專案的過程中，我遇到了幾個主要的技術難題，並進行了一些嘗試與優化。最終，我成功將模型的準確率提升至 **42.8%**，並且達到了預期的結果。
+
+### 1. 類別不平衡處理
+
+由於數據集存在顯著的類別不平衡問題，我最初嘗試使用 **SMOTE (Synthetic Minority Over-sampling Technique)** 來處理不平衡問題。該方法能夠生成合成的少數類別樣本，理論上有助於提高模型對少數類別的識別能力。然而，由於 **SMOTE** 方法非常耗時且難以有效優化，因此我最終放棄了此方法，並探索了其他方式來處理類別不平衡。
+
+### 2. 數據增強與過採樣
+
+我對數據增強和過採樣進行了多種嘗試，並根據不同條件進行調整（例如：畫家作品數小於平均值或根據標準差進行條件判斷），卻反而會大幅降低準確率。儘管如此，我的實驗結果顯示，無論是否進行這些處理，我的模型結構仍然能夠在測試集上取得相對較高的準確度。這表明即使在類別不平衡的情況下，適當的模型結構也能有效達到較好的表現，因此我最終決定保持目前的數據處理方法。
+
+### 3. 集成學習與GPU記憶體限制
+
+在進行 **集成學習 (Ensemble Learning)** 時，我面臨了 **GPU 記憶體不足** 的問題，特別是在同時訓練多個模型時。為了避免這個問題，我在程式碼中加入了許多垃圾回收（GC）機制，以釋放記憶體。然而，這樣的措施仍然無法完全消除 GPU 記憶體的壓力。最終，我選擇了排除那些 F1 分數非常低的模型，並進行模型選擇，而不是一次性訓練所有 10 種模型。這樣能夠有效減少記憶體佔用，同時提升集成模型的表現。
+
+## 🧑‍🔬 作者
+許庭維 (Yves Hsu) <jjoihny51207@gmail.com>
+
+GitHub: [hsutingwei](https://github.com/hsutingwei)
 
 ## 🎯 參考資料
-Best Artworks of All Time - Kaggle Dataset
+[Best Artworks of All Time - Kaggle Dataset](https://www.kaggle.com/datasets/ikarus777/best-artworks-of-all-time/data)
 
-TensorFlow Documentation
+[TensorFlow Documentation](https://www.tensorflow.org/?hl=zh-tw)
